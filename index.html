@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paradis Blueprint Editor</title>
+  <style>
+    :root{
+      --bg:#0f0f10;
+      --panel:#1a1b1e;
+      --panel2:#22252a;
+      --text:#e7e7e7;
+      --muted:#a7a7a7;
+      --accent:#00ffd5;
+      --accent2:#7dd3fc;
+      --warn:#ffcc66;
+      --grid:rgba(255,255,255,.10);
+      --grid2:rgba(255,255,255,.18);
+      --line:#ffffff;
+    }
+    html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; overflow:hidden;}
+    body{display:flex; flex-direction:column;}
+    header{
+      height:60px; flex:0 0 60px;
+      display:flex; align-items:center; gap:12px;
+      padding:0 14px; background:#121317; border-bottom:1px solid #2b2d33;
+    }
+    header h1{font-size:16px; margin:0; color:var(--warn); letter-spacing:.4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .menu-btn, .top-btn{
+      border:1px solid #3a3d46; background:#1e2128; color:var(--text);
+      border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:600;
+    }
+    .top-btn:hover,.menu-btn:hover{background:#252932;}
+    .hint{margin-left:auto; color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .workspace{flex:1; display:flex; min-height:0;}
+    .sidebar{
+      width:340px; flex:0 0 340px;
+      background:var(--panel); border-right:1px solid #2b2d33;
+      padding:14px; box-sizing:border-box; overflow:auto;
+    }
+    .group{
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      border:1px solid #30333a; border-radius:14px; padding:12px; margin-bottom:12px;
+    }
+    .group h3{margin:0 0 10px 0; font-size:14px; color:var(--accent);}
+    .row{display:flex; gap:8px;}
+    .row > *{flex:1;}
+    label{display:block; font-size:11px; color:var(--muted); margin:8px 0 5px; text-transform:uppercase; letter-spacing:.06em;}
+    input, select{
+      width:100%; box-sizing:border-box;
+      border:1px solid #3a3d46; background:#101215; color:var(--text);
+      border-radius:10px; padding:10px 10px; outline:none;
+    }
+    input:focus, select:focus{border-color:var(--accent);}
+    .btn{
+      width:100%; border:1px solid #39414c; background:#1f232b; color:var(--text);
+      border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:700;
+      margin-top:8px;
+    }
+    .btn:hover{background:#262b35;}
+    .btn.primary{background:#214047; border-color:#2c5964;}
+    .btn.primary:hover{background:#27505a;}
+    .btn.small{padding:8px 10px; font-size:13px;}
+    .checks{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+    .check{
+      display:flex; align-items:center; gap:8px; font-size:13px;
+      background:#15171b; border:1px solid #30333a; border-radius:10px; padding:8px 10px;
+    }
+    .check input{width:auto; margin:0;}
+    .info{
+      background:rgba(0,255,213,.08); border:1px solid rgba(0,255,213,.35); border-radius:14px; padding:12px;
+    }
+    .info .big{font-size:22px; font-weight:800; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; line-height:1.2;}
+    .info .sub{font-size:12px; color:var(--muted); margin-top:4px;}
+    .canvas-wrap{position:relative; flex:1; min-width:0; background:#000; overflow:hidden;}
+    canvas{width:100%; height:100%; display:block; touch-action:none; cursor:grab;}
+    canvas.dragging{cursor:grabbing;}
+    .canvas-ui{
+      position:absolute; top:12px; right:12px; display:flex; gap:8px; z-index:2;
+    }
+    .pill{
+      background:rgba(0,0,0,.65); color:#fff; border:1px solid rgba(255,255,255,.15);
+      border-radius:999px; padding:8px 12px; font-size:12px;
+    }
+    .status{
+      position:absolute; left:12px; bottom:12px; right:12px;
+      display:flex; gap:8px; flex-wrap:wrap; z-index:2;
+    }
+    .status .pill{backdrop-filter: blur(6px);}
+    .mobile-only{display:none;}
+    @media (max-width: 860px){
+      .sidebar{
+        position:absolute; z-index:20; top:60px; left:0; bottom:0;
+        transform:translateX(-100%); transition:transform .25s ease;
+        width:min(340px, 88vw);
+      }
+      .sidebar.open{transform:translateX(0);}
+      .mobile-only{display:inline-flex;}
+      .hint{display:none;}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <button class="menu-btn mobile-only" id="menuBtn">☰</button>
+    <h1>Paradis Blueprint Editor</h1>
+    <div class="hint">0,0 is the center • click a block for coordinates • districts are built into the land</div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar" id="sidebar">
+      <div class="group">
+        <h3>Map View</h3>
+        <label for="viewMode">View</label>
+        <select id="viewMode">
+          <option value="all">All layers</option>
+          <option value="mitras">Mitras only</option>
+          <option value="sina">Wall Sina only</option>
+          <option value="rose">Wall Rose only</option>
+          <option value="maria" selected>Wall Maria only</option>
+        </select>
+
+        <div class="checks" style="margin-top:10px;">
+          <label class="check"><input type="checkbox" id="showLand" checked>Land</label>
+          <label class="check"><input type="checkbox" id="showWalls" checked>Walls</label>
+          <label class="check"><input type="checkbox" id="showGrid" checked>Grid</label>
+          <label class="check"><input type="checkbox" id="showLabels" checked>Labels</label>
+        </div>
+
+        <button class="btn primary" id="regenBtn">Generate / Refresh</button>
+        <button class="btn" id="resetBtn">Reset View</button>
+      </div>
+
+      <div class="group">
+        <h3>Center</h3>
+        <div class="row">
+          <div>
+            <label for="centerX">X</label>
+            <input type="number" id="centerX" value="0">
+          </div>
+          <div>
+            <label for="centerZ">Z</label>
+            <input type="number" id="centerZ" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Radii (blocks)</h3>
+        <div class="row">
+          <div><label for="rMitras">Mitras</label><input type="number" id="rMitras" value="40"></div>
+          <div><label for="rSina">Sina</label><input type="number" id="rSina" value="85"></div>
+        </div>
+        <div class="row">
+          <div><label for="rRose">Rose</label><input type="number" id="rRose" value="150"></div>
+          <div><label for="rMaria">Maria</label><input type="number" id="rMaria" value="220"></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>District Shape</h3>
+        <div class="row">
+          <div><label for="districtLen">Length</label><input type="number" id="districtLen" value="22"></div>
+          <div><label for="districtWidth">Width</label><input type="number" id="districtWidth" value="44"></div>
+        </div>
+        <div class="row">
+          <div><label for="wallThickness">Wall thickness</label><input type="number" id="wallThickness" value="3"></div>
+          <div><label for="wallHeight">Wall height</label><input type="number" id="wallHeight" value="50"></div>
+        </div>
+        <div class="row">
+          <div><label for="opacity">Land opacity</label><input type="number" id="opacity" min="10" max="100" value="55"></div>
+          <div><label>&nbsp;</label><input type="text" value="Height is reference only" disabled></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Interaction</h3>
+        <div class="row">
+          <button class="btn small" id="zoomInBtn">Zoom +</button>
+          <button class="btn small" id="zoomOutBtn">Zoom -</button>
+        </div>
+        <button class="btn" id="fitBtn">Fit to View</button>
+      </div>
+
+      <div class="info">
+        <div class="big" id="pickedCoords">X: --  Z: --</div>
+        <div class="sub" id="pickedType">Click a block to select it.</div>
+      </div>
+    </aside>
+
+    <main class="canvas-wrap" id="canvasWrap">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-ui">
+        <div class="pill" id="layerPill">Maria</div>
+        <div class="pill" id="zoomPill">Zoom 100%</div>
+      </div>
+      <div class="status">
+        <div class="pill" id="hoverPill">Hover: X --, Z --</div>
+        <div class="pill" id="worldPill">World centered at 0,0</div>
+      </div>
+    </main>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('canvasWrap');
+  const sidebar = document.getElementById('sidebar');
+
+  const els = {
+    viewMode: document.getElementById('viewMode'),
+    showLand: document.getElementById('showLand'),
+    showWalls: document.getElementById('showWalls'),
+    showGrid: document.getElementById('showGrid'),
+    showLabels: document.getElementById('showLabels'),
+    centerX: document.getElementById('centerX'),
+    centerZ: document.getElementById('centerZ'),
+    rMitras: document.getElementById('rMitras'),
+    rSina: document.getElementById('rSina'),
+    rRose: document.getElementById('rRose'),
+    rMaria: document.getElementById('rMaria'),
+    districtLen: document.getElementById('districtLen'),
+    districtWidth: document.getElementById('districtWidth'),
+    wallThickness: document.getElementById('wallThickness'),
+    opacity: document.getElementById('opacity'),
+    wallHeight: document.getElementById('wallHeight'),
+    regenBtn: document.getElementById('regenBtn'),
+    resetBtn: document.getElementById('resetBtn'),
+    zoomInBtn: document.getElementById('zoomInBtn'),
+    zoomOutBtn: document.getElementById('zoomOutBtn'),
+    fitBtn: document.getElementById('fitBtn'),
+    menuBtn: document.getElementById('menuBtn'),
+    pickedCoords: document.getElementById('pickedCoords'),
+    pickedType: document.getElementById('pickedType'),
+    layerPill: document.getElementById('layerPill'),
+    zoomPill: document.getElementById('zoomPill'),
+    hoverPill: document.getElementById('hoverPill'),
+    worldPill: document.getElementById('worldPill')
+  };
+
+  const LAYERS = {
+    mitras: { name: 'Mitras', land: 'rgba(210,210,210,0.55)', wall: 'rgba(255,255,255,0.95)', label: 'Mitras', hasDistricts: false },
+    sina:   { name: 'Wall Sina', land: 'rgba(124, 203, 140, 0.55)', wall: 'rgba(220,220,220,0.95)', label: 'Sina', hasDistricts: true },
+    rose:   { name: 'Wall Rose', land: 'rgba(255, 170, 90, 0.55)', wall: 'rgba(255,255,255,0.95)', label: 'Rose', hasDistricts: true },
+    maria:  { name: 'Wall Maria', land: 'rgba(97, 171, 106, 0.55)', wall: 'rgba(255,255,255,0.95)', label: 'Maria', hasDistricts: true }
+  };
+
+  const state = {
+    dpr: Math.max(1, window.devicePixelRatio || 1),
+    width: 0,
+    height: 0,
+    scale: 4.5,
+    cameraX: 0,
+    cameraY: 0,
+    dragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    selected: null,
+    hover: null,
+    layers: {},
+    layerOrder: ['mitras', 'sina', 'rose', 'maria']
+  };
+
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function key(x, z) { return `${x},${z}`; }
+  function parseNum(el) { return parseInt(el.value, 10) || 0; }
+
+  function hexAlpha(hex, alpha) {
+    return hex.replace('0.55', String(alpha));
+  }
+
+  function setCanvasSize() {
+    const rect = wrap.getBoundingClientRect();
+    state.width = rect.width;
+    state.height = rect.height;
+    canvas.width = Math.round(rect.width * state.dpr);
+    canvas.height = Math.round(rect.height * state.dpr);
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+    draw();
+  }
+
+  function worldToScreen(x, z) {
+    return {
+      x: state.width / 2 + state.cameraX + x * state.scale,
+      y: state.height / 2 + state.cameraY + z * state.scale
+    };
+  }
+
+  function screenToWorld(sx, sy) {
+    return {
+      x: (sx - state.width / 2 - state.cameraX) / state.scale,
+      z: (sy - state.height / 2 - state.cameraY) / state.scale
+    };
+  }
+
+  function worldToCell(sx, sy) {
+    const w = screenToWorld(sx, sy);
+    return { x: Math.floor(w.x), z: Math.floor(w.z) };
+  }
+
+  function addRectCells(set, x0, z0, x1, z1, label, color) {
+    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+    const minZ = Math.min(z0, z1), maxZ = Math.max(z0, z1);
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        set.set(key(x, z), { x, z, type: label, color });
+      }
+    }
+  }
+
+  function addCircleCells(set, cx, cz, r, label, color) {
+    for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      for (let z = Math.floor(cz - r); z <= Math.ceil(cz + r); z++) {
+        const dx = x - cx;
+        const dz = z - cz;
+        if (dx * dx + dz * dz <= r * r) {
+          set.set(key(x, z), { x, z, type: label, color });
+        }
+      }
+    }
+  }
+
+  function addDistrictDome(set, cx, cz, r, len, width, dir, label, color) {
+    const halfWidth = Math.max(1, width / 2);
+    const domeLen = Math.max(1, len);
+    const baseX = dir === 'E' ? cx + r : dir === 'W' ? cx - r : cx;
+    const baseZ = dir === 'S' ? cz + r : dir === 'N' ? cz - r : cz;
+    const pad = 2;
+    const xReach = (dir === 'E' || dir === 'W') ? domeLen : halfWidth;
+    const zReach = (dir === 'N' || dir === 'S') ? domeLen : halfWidth;
+
+    const minX = Math.floor(baseX - xReach - pad);
+    const maxX = Math.ceil(baseX + xReach + pad);
+    const minZ = Math.floor(baseZ - zReach - pad);
+    const maxZ = Math.ceil(baseZ + zReach + pad);
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        const dx = x - baseX;
+        const dz = z - baseZ;
+        let inHalf = false;
+        let norm = 0;
+
+        if (dir === 'E' && dx >= 0) {
+          norm = (dx * dx) / (domeLen * domeLen) + (dz * dz) / (halfWidth * halfWidth);
+          inHalf = true;
+        } else if (dir === 'W' && dx <= 0) {
+          norm = (dx * dx) / (domeLen * domeLen) + (dz * dz) / (halfWidth * halfWidth);
+          inHalf = true;
+        } else if (dir === 'N' && dz <= 0) {
+          norm = (dx * dx) / (halfWidth * halfWidth) + (dz * dz) / (domeLen * domeLen);
+          inHalf = true;
+        } else if (dir === 'S' && dz >= 0) {
+          norm = (dx * dx) / (halfWidth * halfWidth) + (dz * dz) / (domeLen * domeLen);
+          inHalf = true;
+        }
+
+        if (inHalf && norm <= 1) {
+          set.set(key(x, z), { x, z, type: label, color });
+        }
+      }
+    }
+  }
+
+  function buildLandSet(cx, cz, r, layerName, landColor, len, width, districtScale = 1, hasDistricts = true) {
+    const set = new Map();
+    addCircleCells(set, cx, cz, r, `${layerName} Floor`, landColor);
+    if (!hasDistricts) return set;
+    const scaledLen = Math.max(1, len * districtScale);
+    const scaledWidth = Math.max(2, width * districtScale, scaledLen * 2);
+    addDistrictDome(set, cx, cz, r, scaledLen, scaledWidth, 'N', `${layerName} District`, 'rgba(0,200,255,0.55)');
+    addDistrictDome(set, cx, cz, r, scaledLen, scaledWidth, 'S', `${layerName} District`, 'rgba(0,200,255,0.55)');
+    addDistrictDome(set, cx, cz, r, scaledLen, scaledWidth, 'E', `${layerName} District`, 'rgba(0,200,255,0.55)');
+    addDistrictDome(set, cx, cz, r, scaledLen, scaledWidth, 'W', `${layerName} District`, 'rgba(0,200,255,0.55)');
+    return set;
+  }
+
+  function getNeighbors4(x, z) {
+    return [
+      [x + 1, z], [x - 1, z],
+      [x, z + 1], [x, z - 1]
+    ];
+  }
+
+  function outlineFromLand(landSet, thickness, label, color) {
+    const wall = new Map();
+    const boundary = [];
+    for (const cell of landSet.values()) {
+      let edge = false;
+      for (const [nx, nz] of getNeighbors4(cell.x, cell.z)) {
+        if (!landSet.has(key(nx, nz))) {
+          edge = true;
+          break;
+        }
+      }
+      if (edge) boundary.push(cell);
+    }
+
+    let frontier = boundary.map(c => ({ x: c.x, z: c.z }));
+    const seen = new Set();
+    for (let i = 0; i < thickness; i++) {
+      const next = [];
+      for (const c of frontier) {
+        for (const [nx, nz] of getNeighbors4(c.x, c.z)) {
+          const k = key(nx, nz);
+          if (landSet.has(k) || wall.has(k) || seen.has(k)) continue;
+          seen.add(k);
+          wall.set(k, { x: nx, z: nz, type: label, color });
+          next.push({ x: nx, z: nz });
+        }
+      }
+      frontier = next;
+      if (!frontier.length) break;
+    }
+    return wall;
+  }
+
+  function mergeBounds(bounds, map) {
+    for (const cell of map.values()) {
+      bounds.minX = Math.min(bounds.minX, cell.x);
+      bounds.maxX = Math.max(bounds.maxX, cell.x + 1);
+      bounds.minZ = Math.min(bounds.minZ, cell.z);
+      bounds.maxZ = Math.max(bounds.maxZ, cell.z + 1);
+    }
+  }
+
+  function buildBlueprint() {
+    const cx = parseNum(els.centerX);
+    const cz = parseNum(els.centerZ);
+    const districtLen = Math.max(0, parseNum(els.districtLen));
+    const districtWidth = Math.max(1, parseNum(els.districtWidth));
+    const wallThickness = Math.max(1, parseNum(els.wallThickness));
+    const wallHeight = Math.max(1, parseNum(els.wallHeight));
+    const opacity = clamp(parseNum(els.opacity), 10, 100) / 100;
+    const radii = {
+      mitras: Math.max(1, parseNum(els.rMitras)),
+      sina: Math.max(1, parseNum(els.rSina)),
+      rose: Math.max(1, parseNum(els.rRose)),
+      maria: Math.max(1, parseNum(els.rMaria))
+    };
+
+    const colors = {
+      mitras: `rgba(210,210,210,${opacity})`,
+      sina: `rgba(124,203,140,${opacity})`,
+      rose: `rgba(255,170,90,${opacity})`,
+      maria: `rgba(97,171,106,${opacity})`
+    };
+
+    const districtBaseRadius = Math.max(1, Math.min(...state.layerOrder
+      .filter(id => LAYERS[id].hasDistricts)
+      .map(id => radii[id])));
+
+    const layers = {};
+    for (const id of state.layerOrder) {
+      const layer = LAYERS[id];
+      const districtScale = layer.hasDistricts ? radii[id] / districtBaseRadius : 1;
+      const land = buildLandSet(cx, cz, radii[id], layer.name, colors[id], districtLen, districtWidth, districtScale, layer.hasDistricts);
+      const wall = outlineFromLand(land, wallThickness, `${layer.name} Wall`, layer.wall);
+      layers[id] = { land, wall, cx, cz, radius: radii[id], name: layer.name };
+    }
+    state.layers = layers;
+    updatePills();
+    fitToView();
+    draw();
+  }
+
+  function getActiveLayerIds() {
+    const mode = els.viewMode.value;
+    if (mode === 'all') return state.layerOrder.slice();
+    return [mode];
+  }
+
+  function getVisibleSets() {
+    const ids = getActiveLayerIds();
+    const showLand = els.showLand.checked;
+    const showWalls = els.showWalls.checked;
+    const landSets = [];
+    const wallSets = [];
+    for (const id of ids) {
+      const layer = state.layers[id];
+      if (!layer) continue;
+      if (showLand) landSets.push({ id, map: layer.land });
+      if (showWalls) wallSets.push({ id, map: layer.wall });
+    }
+    return { landSets, wallSets };
+  }
+
+  function getBoundsForCurrentView() {
+    const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    const { landSets, wallSets } = getVisibleSets();
+    for (const item of landSets) mergeBounds(bounds, item.map);
+    for (const item of wallSets) mergeBounds(bounds, item.map);
+
+    if (!isFinite(bounds.minX)) {
+      return { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
+    }
+    return bounds;
+  }
+
+  function fitToView() {
+    const bounds = getBoundsForCurrentView();
+    const w = bounds.maxX - bounds.minX;
+    const h = bounds.maxZ - bounds.minZ;
+    const pad = 0.82;
+    const sx = (state.width * pad) / Math.max(1, w);
+    const sy = (state.height * pad) / Math.max(1, h);
+    state.scale = clamp(Math.min(sx, sy), 1, 32);
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cz = (bounds.minZ + bounds.maxZ) / 2;
+    state.cameraX = -cx * state.scale;
+    state.cameraY = -cz * state.scale;
+    updatePills();
+    draw();
+  }
+
+  function resetViewCenterOnly() {
+    state.cameraX = 0;
+    state.cameraY = 0;
+    state.scale = 4.5;
+    updatePills();
+    draw();
+  }
+
+  function updatePills() {
+    const mode = els.viewMode.value;
+    const name = mode === 'all' ? 'All layers' : LAYERS[mode].label;
+    els.layerPill.textContent = name;
+    els.zoomPill.textContent = `Zoom ${Math.round(state.scale * 100)}%`;
+    els.worldPill.textContent = `Center: X ${parseNum(els.centerX)}, Z ${parseNum(els.centerZ)} • Wall H ${parseNum(els.wallHeight)}`;
+  }
+
+  function drawGrid() {
+    if (!els.showGrid.checked) return;
+    const minorStep = Math.max(1, Math.round(10 / state.scale));
+    const majorStep = minorStep * 5;
+
+    const topLeft = screenToWorld(0, 0);
+    const bottomRight = screenToWorld(state.width, state.height);
+
+    const minX = Math.floor(topLeft.x) - 2;
+    const maxX = Math.ceil(bottomRight.x) + 2;
+    const minZ = Math.floor(topLeft.z) - 2;
+    const maxZ = Math.ceil(bottomRight.z) + 2;
+
+    ctx.save();
+    for (let x = Math.floor(minX / minorStep) * minorStep; x <= maxX; x += minorStep) {
+      const sx = worldToScreen(x, 0).x;
+      ctx.beginPath();
+      ctx.strokeStyle = (x % majorStep === 0) ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      ctx.moveTo(sx, 0);
+      ctx.lineTo(sx, state.height);
+      ctx.stroke();
+    }
+
+    for (let z = Math.floor(minZ / minorStep) * minorStep; z <= maxZ; z += minorStep) {
+      const sy = worldToScreen(0, z).y;
+      ctx.beginPath();
+      ctx.strokeStyle = (z % majorStep === 0) ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      ctx.moveTo(0, sy);
+      ctx.lineTo(state.width, sy);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawCell(cell, fillStyle, strokeStyle = 'rgba(0,0,0,0.45)', lineWidth = 1) {
+    const p = worldToScreen(cell.x, cell.z);
+    ctx.fillStyle = fillStyle;
+    ctx.fillRect(p.x, p.y, state.scale, state.scale);
+    if (state.scale >= 3) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      ctx.strokeRect(p.x, p.y, state.scale, state.scale);
+    }
+  }
+
+  function drawLabels(layerIds) {
+    if (!els.showLabels.checked) return;
+    ctx.save();
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.lineWidth = 3;
+    for (const id of layerIds) {
+      const layer = state.layers[id];
+      if (!layer) continue;
+      const p = worldToScreen(layer.cx, layer.cz);
+      const text = layer.name;
+      ctx.strokeText(text, p.x + 6, p.y - 6);
+      ctx.fillText(text, p.x + 6, p.y - 6);
+    }
+    ctx.restore();
+  }
+
+  function drawSelection() {
+    if (!state.selected) return;
+    const p = worldToScreen(state.selected.x, state.selected.z);
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,0,0.85)';
+    ctx.fillRect(p.x, p.y, state.scale, state.scale);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(p.x, p.y, state.scale, state.scale);
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, state.width, state.height);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, state.width, state.height);
+
+    drawGrid();
+
+    const activeIds = getActiveLayerIds();
+    const { landSets, wallSets } = getVisibleSets();
+
+    const topLeft = screenToWorld(0, 0);
+    const bottomRight = screenToWorld(state.width, state.height);
+    const minX = Math.floor(Math.min(topLeft.x, bottomRight.x)) - 2;
+    const maxX = Math.ceil(Math.max(topLeft.x, bottomRight.x)) + 2;
+    const minZ = Math.floor(Math.min(topLeft.z, bottomRight.z)) - 2;
+    const maxZ = Math.ceil(Math.max(topLeft.z, bottomRight.z)) + 2;
+
+    if (els.showLand.checked) {
+      for (const item of landSets) {
+        const fill = LAYERS[item.id].land;
+        for (let x = minX; x <= maxX; x++) {
+          for (let z = minZ; z <= maxZ; z++) {
+            const cell = item.map.get(key(x, z));
+            if (cell) drawCell(cell, fill, 'rgba(0,0,0,0.35)', 1);
+          }
+        }
+      }
+    }
+
+    if (els.showWalls.checked) {
+      for (const item of wallSets) {
+        for (let x = minX; x <= maxX; x++) {
+          for (let z = minZ; z <= maxZ; z++) {
+            const cell = item.map.get(key(x, z));
+            if (cell) drawCell(cell, 'rgba(255,255,255,0.92)', 'rgba(0,0,0,0.55)', 1);
+          }
+        }
+      }
+    }
+
+    drawLabels(activeIds);
+    drawSelection();
+  }
+
+  function selectBlockFromCell(cell) {
+    const activeIds = getActiveLayerIds();
+    const order = els.showWalls.checked ? ['wall','land'] : ['land'];
+    for (const layerId of activeIds) {
+      const layer = state.layers[layerId];
+      if (!layer) continue;
+      for (const kind of order) {
+        const map = layer[kind];
+        const found = map.get(key(cell.x, cell.z));
+        if (found) {
+          state.selected = found;
+          els.pickedCoords.textContent = `X: ${found.x}  Z: ${found.z}`;
+          els.pickedType.textContent = found.type;
+          draw();
+          return;
+        }
+      }
+    }
+    state.selected = { x: cell.x, z: cell.z, type: 'Empty space' };
+    els.pickedCoords.textContent = `X: ${cell.x}  Z: ${cell.z}`;
+    els.pickedType.textContent = 'Empty space';
+    draw();
+  }
+
+  function updateHover(sx, sy) {
+    const cell = worldToCell(sx, sy);
+    els.hoverPill.textContent = `Hover: X ${cell.x}, Z ${cell.z}`;
+  }
+
+  function onPointerDown(e) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    state.dragging = true;
+    state.dragStartX = e.clientX - state.cameraX;
+    state.dragStartY = e.clientY - state.cameraY;
+    canvas.classList.add('dragging');
+    state.pointerMoved = false;
+    state.downAt = { x: e.clientX, y: e.clientY };
+    state.downCell = worldToCell(sx, sy);
+    canvas.setPointerCapture?.(e.pointerId);
+  }
+
+  function onPointerMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    updateHover(sx, sy);
+
+    if (!state.dragging) return;
+    const dx = e.clientX - state.downAt.x;
+    const dy = e.clientY - state.downAt.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) state.pointerMoved = true;
+    state.cameraX = e.clientX - state.dragStartX;
+    state.cameraY = e.clientY - state.dragStartY;
+    draw();
+  }
+
+  function onPointerUp(e) {
+    canvas.classList.remove('dragging');
+    if (state.dragging && !state.pointerMoved) {
+      const cell = state.downCell;
+      selectBlockFromCell(cell);
+    }
+    state.dragging = false;
+  }
+
+  function zoomAt(clientX, clientY, factor) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    const before = screenToWorld(sx, sy);
+    state.scale = clamp(state.scale * factor, 1, 36);
+    const afterPx = worldToScreen(before.x, before.z);
+    state.cameraX += sx - afterPx.x;
+    state.cameraY += sy - afterPx.y;
+    updatePills();
+    draw();
+  }
+
+  function attachEvents() {
+    window.addEventListener('resize', setCanvasSize);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      zoomAt(e.clientX, e.clientY, factor);
+    }, { passive: false });
+
+    const regen = () => buildBlueprint();
+    [els.centerX, els.centerZ, els.rMitras, els.rSina, els.rRose, els.rMaria, els.districtLen, els.districtWidth, els.wallThickness, els.wallHeight, els.opacity, els.viewMode, els.showLand, els.showWalls, els.showGrid, els.showLabels]
+      .forEach(el => el.addEventListener('input', () => { buildBlueprint(); }));
+    els.regenBtn.addEventListener('click', regen);
+    els.resetBtn.addEventListener('click', () => { state.selected = null; els.pickedCoords.textContent = 'X: --  Z: --'; els.pickedType.textContent = 'Click a block to select it.'; resetViewCenterOnly(); });
+    els.zoomInBtn.addEventListener('click', () => { state.scale = clamp(state.scale * 1.25, 1, 36); updatePills(); draw(); });
+    els.zoomOutBtn.addEventListener('click', () => { state.scale = clamp(state.scale / 1.25, 1, 36); updatePills(); draw(); });
+    els.fitBtn.addEventListener('click', fitToView);
+    els.menuBtn?.addEventListener('click', () => sidebar.classList.toggle('open'));
+  }
+
+  function init() {
+    attachEvents();
+    setCanvasSize();
+    buildBlueprint();
+    state.selected = null;
+    els.pickedCoords.textContent = 'X: --  Z: --';
+    els.pickedType.textContent = 'Click a block to select it.';
+    updateHover(0, 0);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
