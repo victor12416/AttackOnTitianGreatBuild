@@ -262,9 +262,56 @@
     layerOrder: ['mitras', 'sina', 'rose', 'maria']
   };
 
+  const SETTINGS_KEY = 'paradis-blueprint-settings';
+  const persistedControls = [
+    els.viewMode,
+    els.showLand,
+    els.showWalls,
+    els.showGrid,
+    els.showLabels,
+    els.centerX,
+    els.centerZ,
+    els.rMitras,
+    els.rSina,
+    els.rRose,
+    els.rMaria,
+    els.districtLen,
+    els.districtWidth,
+    els.wallThickness,
+    els.wallHeight,
+    els.opacity
+  ];
+
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
   function key(x, z) { return `${x},${z}`; }
   function parseNum(el) { return parseInt(el.value, 10) || 0; }
+
+  function saveSettings() {
+    const settings = {};
+    for (const el of persistedControls) {
+      settings[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+    }
+    try {
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (_) {}
+  }
+
+  function loadSettings() {
+    try {
+      const raw = window.localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const settings = JSON.parse(raw);
+      if (!settings || typeof settings !== 'object') return;
+      for (const el of persistedControls) {
+        if (!(el.id in settings)) continue;
+        if (el.type === 'checkbox') {
+          el.checked = Boolean(settings[el.id]);
+        } else {
+          el.value = String(settings[el.id]);
+        }
+      }
+    } catch (_) {}
+  }
 
   function hexAlpha(hex, alpha) {
     return hex.replace('0.55', String(alpha));
@@ -746,9 +793,15 @@
       zoomAt(e.clientX, e.clientY, factor);
     }, { passive: false });
 
-    const regen = () => buildBlueprint();
-    [els.centerX, els.centerZ, els.rMitras, els.rSina, els.rRose, els.rMaria, els.districtLen, els.districtWidth, els.wallThickness, els.wallHeight, els.opacity, els.viewMode, els.showLand, els.showWalls, els.showGrid, els.showLabels]
-      .forEach(el => el.addEventListener('input', () => { buildBlueprint(); }));
+    const regen = () => { saveSettings(); buildBlueprint(); };
+    persistedControls.forEach(el => {
+      const handleUpdate = () => {
+        saveSettings();
+        buildBlueprint();
+      };
+      el.addEventListener('input', handleUpdate);
+      el.addEventListener('change', handleUpdate);
+    });
     els.regenBtn.addEventListener('click', regen);
     els.resetBtn.addEventListener('click', () => { state.selected = null; els.pickedCoords.textContent = 'X: --  Z: --'; els.pickedType.textContent = 'Click a block to select it.'; resetViewCenterOnly(); });
     els.zoomInBtn.addEventListener('click', () => { state.scale = clamp(state.scale * 1.25, 1, 36); updatePills(); draw(); });
@@ -758,6 +811,7 @@
   }
 
   function init() {
+    loadSettings();
     attachEvents();
     setCanvasSize();
     buildBlueprint();
