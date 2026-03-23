@@ -276,6 +276,7 @@
   };
 
   const SETTINGS_KEY = 'paradis-blueprint-settings';
+  const wallOffsetCache = new Map();
   const persistedControls = [
     els.viewMode,
     els.showLand,
@@ -463,6 +464,22 @@
     ];
   }
 
+  function getWallOffsets(thickness) {
+    if (wallOffsetCache.has(thickness)) return wallOffsetCache.get(thickness);
+    const offsets = [];
+    const radiusSq = thickness * thickness;
+    for (let dx = -thickness; dx <= thickness; dx++) {
+      for (let dz = -thickness; dz <= thickness; dz++) {
+        if (dx === 0 && dz === 0) continue;
+        if (dx * dx + dz * dz <= radiusSq) {
+          offsets.push({ dx, dz });
+        }
+      }
+    }
+    wallOffsetCache.set(thickness, offsets);
+    return offsets;
+  }
+
   function outlineFromLand(landSet, thickness, label, color) {
     const wall = new Map();
     const boundary = [];
@@ -477,21 +494,15 @@
       if (edge) boundary.push(cell);
     }
 
-    let frontier = boundary.map(c => ({ x: c.x, z: c.z }));
-    const seen = new Set();
-    for (let i = 0; i < thickness; i++) {
-      const next = [];
-      for (const c of frontier) {
-        for (const [nx, nz] of getNeighbors4(c.x, c.z)) {
-          const k = key(nx, nz);
-          if (landSet.has(k) || wall.has(k) || seen.has(k)) continue;
-          seen.add(k);
-          wall.set(k, { x: nx, z: nz, type: label, color });
-          next.push({ x: nx, z: nz });
-        }
+    const offsets = getWallOffsets(thickness);
+    for (const cell of boundary) {
+      for (const offset of offsets) {
+        const nx = cell.x + offset.dx;
+        const nz = cell.z + offset.dz;
+        const k = key(nx, nz);
+        if (landSet.has(k) || wall.has(k)) continue;
+        wall.set(k, { x: nx, z: nz, type: label, color });
       }
-      frontier = next;
-      if (!frontier.length) break;
     }
     return wall;
   }
