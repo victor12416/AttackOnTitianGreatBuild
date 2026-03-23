@@ -196,6 +196,7 @@
       </div>
       <div class="status">
         <div class="pill" id="hoverPill">Hover: X --, Z --</div>
+        <div class="pill" id="selectedPill">Selected: X --, Z --</div>
         <div class="pill" id="worldPill">World centered at 0,0</div>
       </div>
     </main>
@@ -236,6 +237,7 @@
     layerPill: document.getElementById('layerPill'),
     zoomPill: document.getElementById('zoomPill'),
     hoverPill: document.getElementById('hoverPill'),
+    selectedPill: document.getElementById('selectedPill'),
     worldPill: document.getElementById('worldPill')
   };
 
@@ -256,6 +258,12 @@
     dragging: false,
     dragStartX: 0,
     dragStartY: 0,
+    rebuildTimer: 0,
+    pointers: new Map(),
+    pinchActive: false,
+    pinchStartDistance: 0,
+    pinchStartScale: 1,
+    pinchWorld: null,
     selected: null,
     hover: null,
     layers: {},
@@ -315,6 +323,24 @@
 
   function hexAlpha(hex, alpha) {
     return hex.replace('0.55', String(alpha));
+  }
+
+  function updateSelectedPill() {
+    if (!state.selected) {
+      els.selectedPill.textContent = 'Selected: X --, Z --';
+      return;
+    }
+    els.selectedPill.textContent = `Selected: X ${state.selected.x}, Z ${state.selected.z}`;
+  }
+
+  function queueBlueprintBuild(delay = 0) {
+    if (state.rebuildTimer) {
+      window.clearTimeout(state.rebuildTimer);
+    }
+    state.rebuildTimer = window.setTimeout(() => {
+      state.rebuildTimer = 0;
+      buildBlueprint();
+    }, delay);
   }
 
   function setCanvasSize() {
@@ -475,6 +501,10 @@
   }
 
   function buildBlueprint() {
+    if (state.rebuildTimer) {
+      window.clearTimeout(state.rebuildTimer);
+      state.rebuildTimer = 0;
+    }
     const cx = parseNum(els.centerX);
     const cz = parseNum(els.centerZ);
     const districtLen = Math.max(0, parseNum(els.districtLen));
@@ -501,7 +531,8 @@
       .map(id => radii[id])));
 
     const layers = {};
-    for (const id of state.layerOrder) {
+    const buildIds = getActiveLayerIds();
+    for (const id of buildIds) {
       const layer = LAYERS[id];
       const districtScale = layer.hasDistricts ? radii[id] / districtBaseRadius : 1;
       const land = buildLandSet(cx, cz, radii[id], layer.name, colors[id], districtLen, districtWidth, districtScale, layer.hasDistricts);
@@ -714,6 +745,7 @@
           state.selected = found;
           els.pickedCoords.textContent = `X: ${found.x}  Z: ${found.z}`;
           els.pickedType.textContent = found.type;
+          updateSelectedPill();
           draw();
           return;
         }
@@ -722,6 +754,7 @@
     state.selected = { x: cell.x, z: cell.z, type: 'Empty space' };
     els.pickedCoords.textContent = `X: ${cell.x}  Z: ${cell.z}`;
     els.pickedType.textContent = 'Empty space';
+    updateSelectedPill();
     draw();
   }
 
@@ -734,6 +767,7 @@
     const rect = canvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
+    state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     state.dragging = true;
     state.dragStartX = e.clientX - state.cameraX;
     state.dragStartY = e.clientY - state.cameraY;
@@ -741,7 +775,37 @@
     state.pointerMoved = false;
     state.downAt = { x: e.clientX, y: e.clientY };
     state.downCell = worldToCell(sx, sy);
+    if (state.pointers.size === 2) {
+      beginPinchZoom();
+    }
     canvas.setPointerCapture?.(e.pointerId);
+  }
+
+  function getPointerMetrics() {
+    if (state.pointers.size < 2) return null;
+    const points = [...state.pointers.values()];
+    const a = points[0];
+    const b = points[1];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    return {
+      distance: Math.max(1, Math.hypot(dx, dy)),
+      clientX: (a.x + b.x) / 2,
+      clientY: (a.y + b.y) / 2
+    };
+  }
+
+  function beginPinchZoom() {
+    const metrics = getPointerMetrics();
+    if (!metrics) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = metrics.clientX - rect.left;
+    const sy = metrics.clientY - rect.top;
+    state.pinchActive = true;
+    state.pinchStartDistance = metrics.distance;
+    state.pinchStartScale = state.scale;
+    state.pinchWorld = screenToWorld(sx, sy);
+    state.pointerMoved = true;
   }
 
   function onPointerMove(e) {
@@ -749,6 +813,24 @@
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     updateHover(sx, sy);
+    if (state.pointers.has(e.pointerId)) {
+      state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (state.pointers.size >= 2) {
+      if (!state.pinchActive) beginPinchZoom();
+      const metrics = getPointerMetrics();
+      if (!metrics || !state.pinchWorld) return;
+      state.scale = clamp(state.pinchStartScale * (metrics.distance / state.pinchStartDistance), 1, 36);
+      const pinchSx = metrics.clientX - rect.left;
+      const pinchSy = metrics.clientY - rect.top;
+      const afterPx = worldToScreen(state.pinchWorld.x, state.pinchWorld.z);
+      state.cameraX += pinchSx - afterPx.x;
+      state.cameraY += pinchSy - afterPx.y;
+      updatePills();
+      draw();
+      return;
+    }
 
     if (!state.dragging) return;
     const dx = e.clientX - state.downAt.x;
@@ -760,12 +842,28 @@
   }
 
   function onPointerUp(e) {
-    canvas.classList.remove('dragging');
+    state.pointers.delete(e.pointerId);
+    if (state.pointers.size < 2) {
+      state.pinchActive = false;
+      state.pinchWorld = null;
+    }
     if (state.dragging && !state.pointerMoved) {
       const cell = state.downCell;
       selectBlockFromCell(cell);
     }
-    state.dragging = false;
+    state.dragging = state.pointers.size > 0;
+    if (state.dragging) {
+      const remaining = state.pointers.values().next().value;
+      if (remaining) {
+        state.dragStartX = remaining.x - state.cameraX;
+        state.dragStartY = remaining.y - state.cameraY;
+        state.downAt = { x: remaining.x, y: remaining.y };
+      }
+      canvas.classList.add('dragging');
+    } else {
+      canvas.classList.remove('dragging');
+      state.pointerMoved = false;
+    }
   }
 
   function zoomAt(clientX, clientY, factor) {
@@ -795,15 +893,24 @@
 
     const regen = () => { saveSettings(); buildBlueprint(); };
     persistedControls.forEach(el => {
-      const handleUpdate = () => {
+      const isNumberField = el.tagName === 'INPUT' && el.type === 'number';
+      const handleInput = () => {
         saveSettings();
-        buildBlueprint();
+        queueBlueprintBuild(isNumberField ? 120 : 0);
       };
-      el.addEventListener('input', handleUpdate);
-      el.addEventListener('change', handleUpdate);
+      const handleChange = () => {
+        saveSettings();
+        if (isNumberField) {
+          buildBlueprint();
+        } else {
+          queueBlueprintBuild(0);
+        }
+      };
+      el.addEventListener('input', handleInput);
+      el.addEventListener('change', handleChange);
     });
     els.regenBtn.addEventListener('click', regen);
-    els.resetBtn.addEventListener('click', () => { state.selected = null; els.pickedCoords.textContent = 'X: --  Z: --'; els.pickedType.textContent = 'Click a block to select it.'; resetViewCenterOnly(); });
+    els.resetBtn.addEventListener('click', () => { state.selected = null; els.pickedCoords.textContent = 'X: --  Z: --'; els.pickedType.textContent = 'Click a block to select it.'; updateSelectedPill(); resetViewCenterOnly(); });
     els.zoomInBtn.addEventListener('click', () => { state.scale = clamp(state.scale * 1.25, 1, 36); updatePills(); draw(); });
     els.zoomOutBtn.addEventListener('click', () => { state.scale = clamp(state.scale / 1.25, 1, 36); updatePills(); draw(); });
     els.fitBtn.addEventListener('click', fitToView);
@@ -818,6 +925,7 @@
     state.selected = null;
     els.pickedCoords.textContent = 'X: --  Z: --';
     els.pickedType.textContent = 'Click a block to select it.';
+    updateSelectedPill();
     updateHover(0, 0);
   }
 
