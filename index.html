@@ -109,7 +109,7 @@
   <header>
     <button class="menu-btn mobile-only" id="menuBtn">☰</button>
     <h1>Paradis Blueprint Editor</h1>
-    <div class="hint">0,0 is the center • click a block for coordinates • districts are built into the land</div>
+    <div class="hint">0,0 is the center • choose a city and Y layer • click cells for X/Y/Z placement</div>
   </header>
 
   <div class="workspace">
@@ -160,6 +160,31 @@
           <div><label for="rRose">Rose</label><input type="number" id="rRose" value="150"></div>
           <div><label for="rMaria">Maria</label><input type="number" id="rMaria" value="220"></div>
         </div>
+      </div>
+
+      <div class="group">
+        <h3>Build Blueprint</h3>
+        <label for="buildY">Vertical layer (Y above ground)</label>
+        <div class="row">
+          <button class="btn small" id="layerDownBtn" type="button">− Layer</button>
+          <input type="range" id="buildY" min="0" max="50" value="0" aria-label="Blueprint vertical layer">
+          <button class="btn small" id="layerUpBtn" type="button">+ Layer</button>
+        </div>
+        <div class="info" style="margin-top:10px">
+          <div class="big" id="layerName">Ground / foundation</div>
+          <div class="sub" id="layerStats">Placement count appears here.</div>
+        </div>
+        <label>Block labels (editable)</label>
+        <div class="row">
+          <div><label for="groundBlock">Ground</label><input id="groundBlock" value="minecraft:grass_block"></div>
+          <div><label for="foundationBlock">Foundation</label><input id="foundationBlock" value="minecraft:stone_bricks"></div>
+        </div>
+        <div class="row">
+          <div><label for="wallBlock">Wall body</label><input id="wallBlock" value="minecraft:stone_bricks"></div>
+          <div><label for="capBlock">Wall top</label><input id="capBlock" value="minecraft:stone_brick_slab"></div>
+        </div>
+        <button class="btn" id="exportLayerBtn" type="button">Download this layer as CSV</button>
+        <div class="sub" style="margin-top:8px">Y=0 is ground and wall foundation. Y=1 through wall height − 1 is the wall body; the final Y is the coping/top layer. Block IDs are editable suggestions.</div>
       </div>
 
       <div class="group">
@@ -231,6 +256,16 @@
     wallThickness: document.getElementById('wallThickness'),
     opacity: document.getElementById('opacity'),
     wallHeight: document.getElementById('wallHeight'),
+    buildY: document.getElementById('buildY'),
+    layerName: document.getElementById('layerName'),
+    layerStats: document.getElementById('layerStats'),
+    groundBlock: document.getElementById('groundBlock'),
+    foundationBlock: document.getElementById('foundationBlock'),
+    wallBlock: document.getElementById('wallBlock'),
+    capBlock: document.getElementById('capBlock'),
+    layerDownBtn: document.getElementById('layerDownBtn'),
+    layerUpBtn: document.getElementById('layerUpBtn'),
+    exportLayerBtn: document.getElementById('exportLayerBtn'),
     regenBtn: document.getElementById('regenBtn'),
     resetBtn: document.getElementById('resetBtn'),
     zoomInBtn: document.getElementById('zoomInBtn'),
@@ -293,7 +328,12 @@
     els.districtWidth,
     els.wallThickness,
     els.wallHeight,
-    els.opacity
+    els.opacity,
+    els.buildY,
+    els.groundBlock,
+    els.foundationBlock,
+    els.wallBlock,
+    els.capBlock
   ];
 
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -325,6 +365,48 @@
         }
       }
     } catch (_) {}
+  }
+
+  function currentY() { return Math.max(0, parseNum(els.buildY)); }
+
+  function blockForType(type, y) {
+    if (type && type.includes('Wall')) {
+      if (y === 0) return els.foundationBlock.value.trim() || 'minecraft:stone_bricks';
+      if (y >= Math.max(1, parseNum(els.wallHeight))) return els.capBlock.value.trim() || 'minecraft:stone_brick_slab';
+      return els.wallBlock.value.trim() || 'minecraft:stone_bricks';
+    }
+    return els.groundBlock.value.trim() || 'minecraft:grass_block';
+  }
+
+  function updateLayerUI() {
+    const y = currentY(), height = Math.max(1, parseNum(els.wallHeight));
+    els.buildY.max = String(height);
+    const { landSets, wallSets } = getVisibleSets();
+    const wallCount = wallSets.reduce((n, item) => n + item.map.size, 0);
+    const landCount = y === 0 ? landSets.reduce((n, item) => n + item.map.size, 0) : 0;
+    const cells = y === 0 ? landCount + wallCount : wallCount;
+    els.layerName.textContent = y === 0 ? 'Ground / foundation' : y === height ? 'Wall top / coping' : 'Wall course ' + y;
+    const sample = y === 0 ? (els.groundBlock.value || 'minecraft:grass_block') + ' ground; ' + (els.foundationBlock.value || 'minecraft:stone_bricks') + ' wall base' :
+      y === height ? (els.capBlock.value || 'minecraft:stone_brick_slab') : (els.wallBlock.value || 'minecraft:stone_bricks');
+    els.layerStats.textContent = 'Y=' + y + ' • ' + cells.toLocaleString() + ' placement cells • ' + sample;
+  }
+
+  function exportCurrentLayer() {
+    const y = currentY(), { landSets, wallSets } = getVisibleSets();
+    const rows = [['x','y','z','block']];
+    if (y === 0 && els.showLand.checked) {
+      for (const item of landSets) for (const cell of item.map.values()) rows.push([cell.x, y, cell.z, blockForType(cell.type, y)]);
+    }
+    if (els.showWalls.checked && y <= Math.max(1, parseNum(els.wallHeight))) {
+      for (const item of wallSets) for (const cell of item.map.values()) rows.push([cell.x, y, cell.z, blockForType(cell.type, y)]);
+    }
+    const csv = rows.map(row => row.map(value => '"' + String(value).replaceAll('"','""') + '"').join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'paradis-' + els.viewMode.value + '-y' + y + '.csv';
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function hexAlpha(hex, alpha) {
@@ -527,6 +609,8 @@
     const districtWidth = Math.max(1, parseNum(els.districtWidth));
     const wallThickness = Math.max(1, parseNum(els.wallThickness));
     const wallHeight = Math.max(1, parseNum(els.wallHeight));
+    els.buildY.max = String(wallHeight);
+    if (currentY() > wallHeight) els.buildY.value = String(wallHeight);
     const opacity = clamp(parseNum(els.opacity), 10, 100) / 100;
     const radii = {
       mitras: Math.max(1, parseNum(els.rMitras)),
@@ -721,7 +805,9 @@
     const minZ = Math.floor(Math.min(topLeft.z, bottomRight.z)) - 2;
     const maxZ = Math.ceil(Math.max(topLeft.z, bottomRight.z)) + 2;
 
-    if (els.showLand.checked) {
+    const y = currentY();
+    const height = Math.max(1, parseNum(els.wallHeight));
+    if (els.showLand.checked && y === 0) {
       for (const item of landSets) {
         const fill = LAYERS[item.id].land;
         for (let x = minX; x <= maxX; x++) {
@@ -733,12 +819,13 @@
       }
     }
 
-    if (els.showWalls.checked) {
+    if (els.showWalls.checked && y <= height) {
       for (const item of wallSets) {
+        const palette = y === height ? '#d7c99a' : y === 0 ? '#777f88' : '#a8aeb4';
         for (let x = minX; x <= maxX; x++) {
           for (let z = minZ; z <= maxZ; z++) {
             const cell = item.map.get(key(x, z));
-            if (cell) drawCell(cell, 'rgba(255,255,255,0.92)', 'rgba(0,0,0,0.55)', 1);
+            if (cell) drawCell(cell, palette, 'rgba(0,0,0,0.55)', 1);
           }
         }
       }
@@ -746,6 +833,7 @@
 
     drawLabels(activeIds);
     drawSelection();
+    updateLayerUI();
   }
 
   function selectBlockFromCell(cell) {
@@ -759,8 +847,8 @@
         const found = map.get(key(cell.x, cell.z));
         if (found) {
           state.selected = found;
-          els.pickedCoords.textContent = `X: ${found.x}  Z: ${found.z}`;
-          els.pickedType.textContent = found.type;
+          els.pickedCoords.textContent = `X: ${found.x}  Y: ${currentY()}  Z: ${found.z}`;
+          els.pickedType.textContent = `${found.type} • place ${blockForType(found.type, currentY())}`;
           updateSelectedPill();
           draw();
           return;
@@ -768,8 +856,8 @@
       }
     }
     state.selected = { x: cell.x, z: cell.z, type: 'Empty space' };
-    els.pickedCoords.textContent = `X: ${cell.x}  Z: ${cell.z}`;
-    els.pickedType.textContent = 'Empty space';
+    els.pickedCoords.textContent = `X: ${cell.x}  Y: ${currentY()}  Z: ${cell.z}`;
+    els.pickedType.textContent = 'Empty space • no blueprint block here';
     updateSelectedPill();
     draw();
   }
@@ -926,6 +1014,11 @@
       el.addEventListener('change', handleChange);
     });
     els.regenBtn.addEventListener('click', regen);
+    els.buildY.addEventListener('input', () => { saveSettings(); updateLayerUI(); draw(); });
+    els.layerDownBtn.addEventListener('click', () => { els.buildY.value = String(Math.max(0, currentY() - 1)); els.buildY.dispatchEvent(new Event('input')); });
+    els.layerUpBtn.addEventListener('click', () => { els.buildY.value = String(Math.min(Math.max(1, parseNum(els.wallHeight)), currentY() + 1)); els.buildY.dispatchEvent(new Event('input')); });
+    [els.groundBlock, els.foundationBlock, els.wallBlock, els.capBlock].forEach(el => el.addEventListener('input', () => { saveSettings(); updateLayerUI(); draw(); }));
+    els.exportLayerBtn.addEventListener('click', exportCurrentLayer);
     els.resetBtn.addEventListener('click', () => { state.selected = null; els.pickedCoords.textContent = 'X: --  Z: --'; els.pickedType.textContent = 'Click a block to select it.'; updateSelectedPill(); resetViewCenterOnly(); });
     els.zoomInBtn.addEventListener('click', () => { state.scale = clamp(state.scale * 1.25, 1, 36); updatePills(); draw(); });
     els.zoomOutBtn.addEventListener('click', () => { state.scale = clamp(state.scale / 1.25, 1, 36); updatePills(); draw(); });
