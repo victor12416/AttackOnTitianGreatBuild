@@ -382,8 +382,8 @@
     const y = currentY(), height = Math.max(1, parseNum(els.wallHeight));
     els.buildY.max = String(height);
     const { landSets, wallSets } = getVisibleSets();
-    const wallCount = wallSets.reduce((n, item) => n + item.map.size, 0);
-    const landCount = y === 0 ? landSets.reduce((n, item) => n + item.map.size, 0) : 0;
+    const wallCount = els.showWalls.checked ? wallSets.reduce((n, item) => n + item.map.size, 0) : 0;
+    const landCount = y === 0 && els.showLand.checked ? landSets.reduce((n, item) => n + item.map.size, 0) : 0;
     const cells = y === 0 ? landCount + wallCount : wallCount;
     els.layerName.textContent = y === 0 ? 'Ground / foundation' : y === height ? 'Wall top / coping' : 'Wall course ' + y;
     const sample = y === 0 ? (els.groundBlock.value || 'minecraft:grass_block') + ' ground; ' + (els.foundationBlock.value || 'minecraft:stone_bricks') + ' wall base' :
@@ -398,13 +398,13 @@
       for (const item of landSets) for (const cell of item.map.values()) rows.push([cell.x, worldY(), cell.z, blockForType(cell.type, y)]);
     }
     if (els.showWalls.checked && y <= Math.max(1, parseNum(els.wallHeight))) {
-      for (const item of wallSets) for (const cell of item.map.values()) rows.push([cell.x, y, cell.z, blockForType(cell.type, y)]);
+      for (const item of wallSets) for (const cell of item.map.values()) rows.push([cell.x, worldY(), cell.z, blockForType(cell.type, y)]);
     }
     const csv = rows.map(row => row.map(value => '"' + String(value).replaceAll('"','""') + '"').join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'paradis-' + els.viewMode.value + '-y' + y + '.csv';
+    link.download = 'paradis-' + els.viewMode.value + '-course' + y + '.csv';
     link.click();
     URL.revokeObjectURL(url);
   }
