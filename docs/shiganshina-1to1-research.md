@@ -2,7 +2,7 @@
 
 ## Scope and coordinate convention
 
-The first detailed build sheet is Shiganshina District, the southern Wall Maria outcrop. The model uses **1 Minecraft block = 1 metre** in the horizontal plane, integer X/Z block coordinates, and a separately selectable ground Y. The existing all-walls schematic is not a 1:1 build plan and must not generate one map cell for every square metre.
+The first detailed build sheet is Shiganshina District, the southern Wall Maria outcrop. The model uses **1 Minecraft block = 1 metre** in the horizontal plane, integer X/Z block coordinates, and a separately selectable ground Y. The starting footprint is 700 m wide with a 530 m gate-to-gate span; the viewer treats that span as total district depth for the first parametric outline. This is an explicit fan-reconstruction assumption. The existing all-walls schematic is not a 1:1 build plan and must not generate one map cell for every square metre.
 
 Keep the district as a local, high-detail sheet. The larger wall system is context geometry only. Render the walls as vector/parametric geometry at overview zoom, and resolve editable block placements only in the visible build area. Preserve the designated inner face of the main ring as the protected boundary; wall thickness extends outward from that boundary so wall construction does not reduce the modeled interior radius.
 
@@ -17,12 +17,12 @@ Keep the district as a local, high-detail sheet. The larger wall system is conte
 | Wall height | about 50 m | Well-attested setting value; useful as a 50-block default, still editable |
 | Shiganshina location | south of Wall Maria | Canon location |
 | Four outer districts per major wall | cardinal positions | Canon layout convention; district names/directions vary by wall |
-| Shiganshina district footprint | no authoritative numeric dimensions located | Must remain an estimate pending direct source calibration |
+| Gate-to-gate span | about 530 m in a fan-made 1:1000 scene-based model | Useful district-scale reconstruction, not canon or official survey |
 | District outer wall/gates/building coordinates | no authoritative construction plan located | Must be authored from calibrated anime/manga frames or user-provided plans; never present generated placements as canon |
 
 The official [Attack on Titan portal’s special gallery](https://aot-portal.com/special-gallery/info/) publishes “Walls” and “broad-scale illustration of the human domain” information cards. The scale figures commonly read from the anime’s introductory card are approximate. The broad territorial illustration is explicitly described by secondary references as not accurately depicting the size of its towns and Walls, so its drawn proportions must not be treated as a survey map.
 
-A fan calculation proposes a district envelope around 11.47 km deep by 8.87 km wide by measuring schematic illustrations and assuming wall-tile dimensions. This is an inference, not an official dimension, and its inputs are not independently established. It may be offered as an editable **provisional footprint preset**, clearly marked “fan estimate,” never locked as ground truth. See the calculation and assumptions in [the fan analysis](https://www.reddit.com/r/attackontitan/comments/14ki12z/).
+A modeler’s [1:1000 greyboard reconstruction](https://www.reddit.com/r/ShingekiNoKyojin/comments/g5wnqu/greyboard_model_of_shiganshina_in_scale_11000/) reports about 53 cm between gates (about 530 m) and uses a 100 × 70 cm board. The board translates to a 1,000 × 700 m modeling envelope, not a verified district boundary; using its 700 m width and 530 m gate span as viewer defaults is an explicit, editable reconstruction. The modeler says the dimensions were estimated from several anime scenes, and notes proportion inconsistencies. This is more district-specific evidence than the broad territory diagram, but remains fan interpretation. A separate [fan calculation](https://www.reddit.com/r/attackontitan/comments/14ki12z/) derives 11.47 × 8.87 km from the broad schematic and wall-tile assumptions; that result conflicts sharply with the scene-based model and is not used as the viewer default.
 
 The [Shiganshina overview](https://www.attackontitan.nl/en/world/shiganshina/) describes it as one of the four districts jutting from Wall Maria and places it in the south. The [Wall Maria overview](https://www.attackontitan.nl/en/world/wall-maria/) describes the outer/inner gate events. In the story, the Shiganshina outer gate in the projecting district and the Wall Maria inner gate are separate breach points. The model should represent gate openings as parts of their respective wall paths, not detached objects and not gaps that silently shift the protected circle.
 
