@@ -328,13 +328,9 @@
     els.districtWidth,
     els.wallThickness,
     els.wallHeight,
-    els.opacity,
-    els.buildY,
-    els.groundBlock,
-    els.foundationBlock,
-    els.wallBlock,
-    els.capBlock
+    els.opacity
   ];
+  const blueprintControls = [els.buildY, els.groundBlock, els.foundationBlock, els.wallBlock, els.capBlock];
 
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
   function key(x, z) { return `${x},${z}`; }
@@ -342,7 +338,7 @@
 
   function saveSettings() {
     const settings = {};
-    for (const el of persistedControls) {
+    for (const el of [...persistedControls, ...blueprintControls]) {
       settings[el.id] = el.type === 'checkbox' ? el.checked : el.value;
     }
     try {
@@ -356,7 +352,7 @@
       if (!raw) return;
       const settings = JSON.parse(raw);
       if (!settings || typeof settings !== 'object') return;
-      for (const el of persistedControls) {
+      for (const el of [...persistedControls, ...blueprintControls]) {
         if (!(el.id in settings)) continue;
         if (el.type === 'checkbox') {
           el.checked = Boolean(settings[el.id]);
