@@ -15,11 +15,11 @@ The viewer separates known relative placement and gate relationships from estima
 
 ## Build workflow
 
-1. Start with **Fit district**. Pan by dragging and zoom at the cursor with the mouse wheel. **Go to coordinate** moves directly to a known X/Z. Click the map to inspect a block coordinate.
+1. Start with **Fit district** for the overview. Pan by dragging and zoom at the cursor with the mouse wheel or the visible +/− controls. **Block view** jumps to a one-block detail view centered on the selected/hovered cell (or outer gate). At 4 or more screen pixels per block, the grid is one square per Minecraft block and wall courses render as individual cells. Below that scale the map deliberately switches to a coarse overview grid. **Go to coordinate** moves directly to a known X/Z. Click the map to select a cell and read its exact coordinates.
 2. Load a top-down reference image under **Reference overlay**. Set its width in metres and center X/Z to align it against known coordinates. The image stays local in the browser session.
 3. Adjust district width/span, protected radius, wall thickness, and gate width as evidence improves. They are editable values, not locked canon dimensions.
 4. Select a vertical course. Course 0 is the wall foundation at the selected ground Y; courses 1 through the configured height build the wall; the last course is the cap.
-5. Select **Enable placement**, zoom to at least 1 pixel per block, then click to place one block at the displayed X/Y/Z. Shift-click removes it. The selected block ID is used for placements and generated wall tiles.
+5. Select **Enable placement**, zoom to at least 4 pixels per block, then click to place one block at the displayed X/Y/Z. The hovered block cell is outlined, and the selected cell remains highlighted. Shift-click removes a placed block. The selected block ID is used for placements and generated wall tiles.
 6. Choose a 64, 128, or 256-block tile and select a point in that area. **Export wall + blocks in tile** writes a sparse CSV for the selected Y course. The wall is rasterized to integer block coordinates and leaves both gate openings clear. You can import a CSV with columns `x,y,z,block`.
 7. Download the project JSON regularly to back up local placement data.
 
