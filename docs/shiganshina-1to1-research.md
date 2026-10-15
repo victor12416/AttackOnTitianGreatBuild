@@ -39,3 +39,8 @@ The [Shiganshina overview](https://www.attackontitan.nl/en/world/shiganshina/) d
 ## Reference work still needed
 
 Before claiming a complete accurate build blueprint, calibrate the district outline, gates, roads, canals, key landmarks, and building clusters against source frames. Use repeated fixed landmarks to correct for perspective, and record the frame/episode/page plus estimated pixel-to-metre scale and confidence. The outer wall’s broad radius can remain a context measurement; it should not force the entire 480 km radius map into a high-detail build sheet.
+## Current implementation
+
+The draft viewer now has a 1 block = 1 metre coordinate grid, parametric district and ring geometry, separate inner/outer gate openings, wall-course selection, sparse block placement and CSV import, reference-image scale/translation, and tile CSV export. Tile export rasterizes only a selected 64/128/256-block square at integer coordinates; it never allocates the entire ring or district footprint. The inner circular wall is placed with its centerline at radius + half-thickness, keeping the selected protected inner-face radius fixed.
+
+The viewer is ready for functional testing of coordinate math and tile output. A visual browser check was unavailable in this environment, so the next tester should verify pan/zoom behavior, overlay alignment, and the two openings in the actual browser. The house/street plan is still intentionally blank: no authoritative source gives a complete block-level Shiganshina plan, and invented placements would look precise without evidence.
